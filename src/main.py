@@ -33,7 +33,7 @@ def _get_model():
 
     # Compile the model
     model.compile(optimizer='adam',
-                  loss='categorical_crossentropy',
+                  loss='SparseCategoricalCrossentropy',
                   metrics=['accuracy'])
 
     return model
@@ -58,13 +58,11 @@ def main():
                                                    min_delta=_MIN_DELTA, patience=_PATIENCE)
 
     # Manually split dataset into training and validation sets
-    # TODO change to X,y
     total_size = (tf.data.experimental.cardinality(selex_ds)).numpy()
     val_size = int(total_size * _VALIDATION_SPLIT)
     train_size = total_size - val_size
     train_ds = selex_ds.take(train_size)
     val_ds = selex_ds.skip(train_size).take(val_size)
-
     model.fit(train_ds,
               epochs=_MAX_EPOCHS_NUM,
               callbacks=[early_stopping],
