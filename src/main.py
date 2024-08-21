@@ -1,5 +1,5 @@
 import sys
-
+import tensorflow as tf
 import keras
 from keras import layers
 from keras import regularizers
@@ -19,7 +19,7 @@ def _get_model():
     model = keras.Sequential()
 
     # 2-layered LSTM with Batch Normalization
-    model.add(layers.LSTM(128, return_sequences=True, input_shape=(timesteps, features)))
+    model.add(layers.LSTM(128, return_sequences=True))
     model.add(layers.BatchNormalization())  # Batch Normalization after the first LSTM layer
 
     model.add(layers.LSTM(64))
@@ -57,10 +57,18 @@ def main():
     early_stopping = keras.callbacks.EarlyStopping(monitor='val_loss', mode='min',
                                                    min_delta=_MIN_DELTA, patience=_PATIENCE)
 
-    model.fit(selex_ds,
-              epohcs=_MAX_EPOCHS_NUM,
-              validation_split=_VALIDATION_SPLIT,
-              callbacks=[early_stopping])
+    # Manually split dataset into training and validation sets
+    # TODO change to X,y
+    total_size = (tf.data.experimental.cardinality(selex_ds)).numpy()
+    val_size = int(total_size * _VALIDATION_SPLIT)
+    train_size = total_size - val_size
+    train_ds = selex_ds.take(train_size)
+    val_ds = selex_ds.skip(train_size).take(val_size)
+
+    model.fit(train_ds,
+              epochs=_MAX_EPOCHS_NUM,
+              callbacks=[early_stopping],
+              validation_data=val_ds)
 
     rna_compete_ds = rna_compete_dataset(rna_compete_file_path)
     model_results = model.predict(rna_compete_ds)

@@ -30,4 +30,5 @@ def rna_compete_dataset(file_path):
     Returns:
         The parsed dataset.
     """
+    # TODO change _rna_compete_dataset_gen to return a callable
     return tf.data.Dataset.from_generator(_rna_compete_dataset_gen(file_path))

@@ -34,9 +34,8 @@ def _random_dna_sequence(seq_len):
     Returns:
         A tensor that represents a random DNA sequence of the given length.
     """
-    indices = sequence_to_tensor(
-        tf.random.uniform([seq_len], 1, seq_len(_NUCLEOTIDES) + 1, dtype=tf.int32))
-    return tf.one_hot(indices, len(_NUCLEOTIDES))
+    indices = tf.random.uniform([seq_len], 0, len(_NUCLEOTIDES), dtype=tf.int32)
+    return tf.one_hot(indices, len(_NUCLEOTIDES), dtype=tf.int32)
 
 
 def random_sequence_dataset(seq_len):
@@ -51,11 +50,12 @@ def random_sequence_dataset(seq_len):
         while True:
             yield _random_dna_sequence(seq_len)
 
-    return tf.data.Dataset.from_generator(_helper())
+    output_signature = tf.TensorSpec(shape=(seq_len,len(_NUCLEOTIDES)), dtype=tf.int32)
+    return tf.data.Dataset.from_generator(_helper, output_signature=output_signature)
 
 
 def _augmentation_mutation(sequence):
-    sequence_len = tf.shape(sequence)[0].numpy()
+    sequence_len = tf.shape(sequence)[0]
     changed_nucleotides_count = int(sequence_len * _MUTATION_FRAC)
 
     indices_to_replace = tf.random.shuffle(tf.range(sequence_len))[:changed_nucleotides_count]
@@ -77,6 +77,7 @@ def _augmentation_translocation(sequence):
 
 def _augmentation_insertion(sequence):
     new_part = _random_dna_sequence(_INSERTION_LEN)
+    # TODO: change index of insertion to be chosen randomly
     return tf.concat([sequence[:_INSERTION_LEN], new_part, sequence[_INSERTION_LEN:]], axis=0)
 
 
@@ -108,4 +109,4 @@ def augment_dataset(dataset):
         dataset: The dataset to be augmented.
     :return:
     """
-    return dataset.map(lambda sequence: _augment_sequence(sequence))
+    return dataset.map(lambda sequence, label: _augment_sequence(sequence, label))
