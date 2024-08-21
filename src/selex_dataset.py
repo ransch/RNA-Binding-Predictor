@@ -66,8 +66,8 @@ def combined_selex_dataset(file_paths):
     """
     # Create a shuffled dataset for each cycle.
     datasets = [
-        _selex_dataset(file_path, cycle=index+1).shuffle(_SHUFFLE_BUFFER_SIZE, reshuffle_each_iteration=True)
-        for index, file_path in enumerate(file_paths)
+        _selex_dataset(file_path, cycle).shuffle(_SHUFFLE_BUFFER_SIZE, reshuffle_each_iteration=True)
+        for cycle, file_path in enumerate(file_paths)
     ]
     datasets.append(_ZeroCycleDataset)
 
