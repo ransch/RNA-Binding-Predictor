@@ -8,6 +8,7 @@ from keras import regularizers
 from dna_dataset_utils import augment_dataset
 from rna_compete_dataset import rna_compete_dataset
 from selex_dataset import combined_selex_dataset
+from time_limit import TimeLimitCallback
 
 _BATCH_SIZE = 32
 _MAX_EPOCHS_NUM = 5000
@@ -16,6 +17,7 @@ _MIN_DELTA = .1
 _PATIENCE = 50
 _L2_REGULARIZATION = .01
 _LEAKY_RELU_SLOPE = .1
+_MAX_MINUTES_TIME_LIMIT = 60
 
 
 def _get_model():
@@ -61,15 +63,18 @@ def main():
 
     selex_ds = augment_dataset(combined_selex_dataset(selex_file_paths)).batch(_BATCH_SIZE)
     model = _get_model()
-    early_stopping = keras.callbacks.EarlyStopping(monitor='val_loss', mode='min',
-                                                   min_delta=_MIN_DELTA, patience=_PATIENCE)
+    time_limit_callback = TimeLimitCallback(max_minutes=_MAX_MINUTES_TIME_LIMIT)
+    early_stopping_callback = keras.callbacks.EarlyStopping(monitor='val_loss', mode='min',
+                                                            min_delta=_MIN_DELTA,
+                                                            patience=_PATIENCE,
+                                                            restore_best_weights=True)
 
     # Manually split the dataset into training and validation sets.
     val_ds = selex_ds.take(_VALIDATION_DATA_SIZE)
     train_ds = selex_ds.skip(_VALIDATION_DATA_SIZE)
     model.fit(train_ds,
               epochs=_MAX_EPOCHS_NUM,
-              callbacks=[early_stopping],
+              callbacks=[time_limit_callback, early_stopping_callback],
               validation_data=val_ds)
 
     rna_compete_ds = rna_compete_dataset(rna_compete_file_path)
