@@ -7,6 +7,8 @@ _NUCLEOTIDES = ['A', 'C', 'G', 'T']
 _AUGMENTATION_PROB = 0.7
 _MUTATION_FRAC = 0.1
 _INSERTION_LEN = 5
+_DELETION_LEN_MIN = 1
+_DELETION_LEN_MAX = 8
 
 
 def sequence_to_tensor(sequence):
@@ -83,8 +85,14 @@ def _augmentation_insertion(sequence):
     return tf.concat([sequence[:insertion_index], new_part, sequence[insertion_index:]], axis=0)
 
 
+def _augmentation_deletion(sequence):
+    deletion_length = random.randint(_DELETION_LEN_MIN, _DELETION_LEN_MAX)
+    deletion_index = random.randint(0, len(sequence) - deletion_length)
+    return tf.concat(sequence[:deletion_index] + sequence[deletion_index + deletion_length:])
+
+
 _DNA_AUGMENTATION_METHODS = [_augmentation_mutation, _augmentation_translocation,
-                             _augmentation_insertion]
+                             _augmentation_insertion, _augmentation_deletion]
 
 
 def _augment_sequence(sequence):
