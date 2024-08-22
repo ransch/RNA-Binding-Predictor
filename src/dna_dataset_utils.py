@@ -50,21 +50,23 @@ def random_sequence_dataset(seq_len):
         while True:
             yield _random_dna_sequence(seq_len)
 
-    output_signature = tf.TensorSpec(shape=(seq_len,len(_NUCLEOTIDES)), dtype=tf.int32)
+    output_signature = tf.TensorSpec(shape=(seq_len, len(_NUCLEOTIDES)), dtype=tf.int32)
     return tf.data.Dataset.from_generator(_helper, output_signature=output_signature)
 
 
 def _augmentation_mutation(sequence):
-    sequence_len = float(tf.shape(sequence)[0])
+    sequence_len = int(tf.shape(sequence)[0])
     changed_nucleotides_count = int(sequence_len * _MUTATION_FRAC)
 
-    indices_to_replace = tf.random.shuffle(tf.range(sequence_len, dtype=tf.int32))[:changed_nucleotides_count]
+    indices_to_replace = tf.random.shuffle(tf.range(sequence_len, dtype=tf.int32))[
+                         :changed_nucleotides_count]
 
     random_nucleotide_indices = tf.random.uniform([changed_nucleotides_count], 0, len(_NUCLEOTIDES),
                                                   dtype=tf.int32)
     replacement = tf.one_hot(random_nucleotide_indices, depth=len(_NUCLEOTIDES), dtype=tf.int32)
 
-    return tf.tensor_scatter_nd_update(tensor=sequence, indices=tf.expand_dims(indices_to_replace, 1),
+    return tf.tensor_scatter_nd_update(tensor=sequence,
+                                       indices=tf.expand_dims(indices_to_replace, 1),
                                        updates=replacement)
 
 
@@ -77,7 +79,7 @@ def _augmentation_translocation(sequence):
 
 def _augmentation_insertion(sequence):
     new_part = _random_dna_sequence(_INSERTION_LEN)
-    insertion_index = random.choice(range(len(sequence)))
+    insertion_index = random.randint(0, len(sequence))
     return tf.concat([sequence[:insertion_index], new_part, sequence[insertion_index:]], axis=0)
 
 
@@ -85,7 +87,7 @@ _DNA_AUGMENTATION_METHODS = [_augmentation_mutation, _augmentation_translocation
                              _augmentation_insertion]
 
 
-def _augment_sequence(sequence, label):
+def _augment_sequence(sequence):
     """
     Randomly augment a DNA sequence.
 
@@ -98,7 +100,7 @@ def _augment_sequence(sequence, label):
     if np.random.binomial(1, 1 - _AUGMENTATION_PROB):
         return sequence
 
-    return random.choice(_DNA_AUGMENTATION_METHODS)(sequence), label
+    return random.choice(_DNA_AUGMENTATION_METHODS)(sequence)
 
 
 def augment_dataset(dataset):
@@ -109,4 +111,4 @@ def augment_dataset(dataset):
         dataset: The dataset to be augmented.
     :return:
     """
-    return dataset.map(lambda sequence, label: _augment_sequence(sequence, label))
+    return dataset.map(lambda sequence, label: (_augment_sequence(sequence), label))

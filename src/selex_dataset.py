@@ -34,23 +34,27 @@ def _selex_dataset_gen(file_path):
     Yields:
          The parsed tensors.
     """
+
     def _helper():
         with open(file_path, 'r') as file:
             for line in file:
                 tensor = _parse_selex_line(line)
                 if tensor is not None:
                     yield tensor
+
     return _helper
 
 
 def _selex_dataset(file_path, cycle):
-    output_signature = tf.TensorSpec(shape=(_SELEX_SEQ_LEN,len(_NUCLEOTIDES)), dtype=tf.int32)
-    return tf.data.Dataset.zip((tf.data.Dataset.from_generator(_selex_dataset_gen(file_path), output_signature=output_signature),
+    output_signature = tf.TensorSpec(shape=(_SELEX_SEQ_LEN, len(_NUCLEOTIDES)), dtype=tf.int32)
+    return tf.data.Dataset.zip((tf.data.Dataset.from_generator(_selex_dataset_gen(file_path),
+                                                               output_signature=output_signature),
                                 tf.data.Dataset.from_tensor_slices(tf.constant([cycle])).repeat()))
 
 
 _ZeroCycleDataset = tf.data.Dataset.zip((random_sequence_dataset(_SELEX_SEQ_LEN),
-                                         tf.data.Dataset.from_tensor_slices(tf.constant([0])).repeat()))
+                                         tf.data.Dataset.from_tensor_slices(
+                                             tf.constant([0])).repeat()))
 
 
 def combined_selex_dataset(file_paths):
@@ -59,15 +63,17 @@ def combined_selex_dataset(file_paths):
     The batches of the returned dataset are balanced.
 
     Args:
-        file_paths: The paths of all the cycles of a single protein.
+        file_paths: The paths of all the cycles of a single protein. It's a dictionary that maps
+        the cycle index to its path.
 
     Yields:
          The combined dataset.
     """
     # Create a shuffled dataset for each cycle.
     datasets = [
-        _selex_dataset(file_path, cycle).shuffle(_SHUFFLE_BUFFER_SIZE, reshuffle_each_iteration=True)
-        for cycle, file_path in enumerate(file_paths)
+        _selex_dataset(file_path, cycle).shuffle(_SHUFFLE_BUFFER_SIZE,
+                                                 reshuffle_each_iteration=True)
+        for cycle, file_path in file_paths.items()
     ]
     datasets.append(_ZeroCycleDataset)
 

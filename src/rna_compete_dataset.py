@@ -13,11 +13,15 @@ def _rna_compete_dataset_gen(file_path):
     Yields:
          The parsed tensors.
     """
-    with open(file_path, 'r') as file:
-        for line in file:
-            tensor = sequence_to_tensor(line.strip())
-            if tensor is not None:
-                yield tensor
+
+    def _helper():
+        with open(file_path, 'r') as file:
+            for line in file:
+                tensor = sequence_to_tensor(line.strip())
+                if tensor is not None:
+                    yield tensor
+
+    return _helper
 
 
 def rna_compete_dataset(file_path):
@@ -30,5 +34,4 @@ def rna_compete_dataset(file_path):
     Returns:
         The parsed dataset.
     """
-    # TODO change _rna_compete_dataset_gen to return a callable
     return tf.data.Dataset.from_generator(_rna_compete_dataset_gen(file_path))
