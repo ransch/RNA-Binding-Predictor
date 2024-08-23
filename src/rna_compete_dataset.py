@@ -1,27 +1,6 @@
 import tensorflow as tf
 
-from dna_dataset_utils import sequence_to_tensor
-
-
-def _rna_compete_dataset_gen(file_path):
-    """
-    Generate sequences of an RNAcompete dataset of a single protein.
-
-    Args:
-        file_path: The path to the RNAcompete dataset.
-
-    Yields:
-         The parsed tensors.
-    """
-
-    def _helper():
-        with open(file_path, 'r') as file:
-            for line in file:
-                tensor = sequence_to_tensor(line.strip())
-                if tensor is not None:
-                    yield tensor
-
-    return _helper
+from dna_dataset_utils import dna_line_filter, sequence_to_tensor
 
 
 def rna_compete_dataset(file_path):
@@ -32,6 +11,11 @@ def rna_compete_dataset(file_path):
         file_path: The path of the RNAcompete dataset.
 
     Returns:
-        The parsed dataset.
+        An RNAcompete dataset.
     """
-    return tf.data.Dataset.from_generator(_rna_compete_dataset_gen(file_path))
+    ds = tf.data.TextLineDataset(file_path)
+    # Filter out invalid lines.
+    ds = ds.filter(dna_line_filter)
+    # Parse the lines as tensors.
+    ds = ds.map(sequence_to_tensor, num_parallel_calls=tf.data.AUTOTUNE, deterministic=True)
+    return ds
