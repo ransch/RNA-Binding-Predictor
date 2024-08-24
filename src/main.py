@@ -45,10 +45,6 @@ def _get_model(max_given_cycle):
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
 
-    model.add(layers.Dense(128, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
-
     model.add(layers.Dense(64, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
@@ -57,7 +53,7 @@ def _get_model(max_given_cycle):
 
     model.add(AverageLast(5 - max_given_cycle))
 
-    model.compile(optimizer=optimizers.Adam(learning_rate=0.01, beta_1=0.7, beta_2=0.8),
+    model.compile(optimizer=optimizers.Adam(learning_rate=_ADAM_LEARNING_RATE),
                   loss='SparseCategoricalCrossentropy',
                   metrics=['accuracy'])
 
