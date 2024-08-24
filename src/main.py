@@ -1,5 +1,6 @@
 import pathlib
 import sys
+import os
 
 import keras
 import numpy as np
@@ -13,6 +14,8 @@ from dna_dataset_utils import augment_dataset
 from rna_compete_dataset import rna_compete_dataset
 from selex_dataset import combined_selex_dataset
 from time_limit import TimeLimitCallback
+
+SAVED_MODEL_PATH = 'saved_model'
 
 _MAX_EPOCHS_NUM = 1000
 _STEPS_PER_EPOCH = 2048
@@ -144,9 +147,30 @@ def _get_tensors(dataset):
     return features, labels
 
 
+def _use_saved_model_for_rna_compete_ds(output_file_path, rna_compete_file_path):
+    model = keras.models.load_model(SAVED_MODEL_PATH)
+    # Evaluate the model on the RNAcompete dataset, and translate the model's outputs into binding
+    # predictions.
+    rna_compete_ds = rna_compete_dataset(rna_compete_file_path).padded_batch(
+        batch_size=_PREDICTION_BATCH_SIZE, padded_shapes=[None, 4], padding_values=0)
+    model_results = model.predict(rna_compete_ds)
+    predictions = _results_to_binding_predictions(model_results)
+
+    # Write the predictions to a file.
+    _write_predictions(output_file_path, predictions)
+
+
 def main():
     output_file_path = sys.argv[1]
     rna_compete_file_path = sys.argv[2]
+
+    # use saved model to adjust _results_to_binding_predictions:
+    if os.path.exists(SAVED_MODEL_PATH):
+        print("Loading saved model...")
+        _use_saved_model_for_rna_compete_ds(output_file_path, rna_compete_file_path)
+        return
+
+    # if no saved model, follow original workflow:
     selex_file_paths = _parse_selex_file_paths(sys.argv[3:])
     max_given_cycle = max(selex_file_paths.keys())
 
@@ -171,6 +195,9 @@ def main():
               callbacks=[time_limit_callback, early_stopping_callback],
               validation_data=_get_tensors(val_ds),
               validation_batch_size=_PREDICTION_BATCH_SIZE)
+
+    #  by default, save a model after it was trained
+    model.save(SAVED_MODEL_PATH)
 
     # Evaluate the model on the RNAcompete dataset, and translate the model's outputs into binding
     # predictions.
