@@ -18,7 +18,7 @@ _MAX_EPOCHS_NUM = 100
 _STEPS_PER_EPOCH = 1024
 _BATCH_SIZE = 128
 _PREDICTION_BATCH_SIZE = 512
-_VALIDATION_DATA_SIZE = 2048
+_VALIDATION_DATA_SIZE = 32768
 _MIN_ACCURACY_IMPROVEMENT_DELTA = .1
 _ACCURACY_IMPROVEMENT_PATIENCE = 3
 _L2_REGULARIZATION_FACTOR = .01
@@ -63,6 +63,13 @@ def _results_to_binding_predictions(model_results):
 
 def _write_predictions(output_file_path, predictions):
     np.savetxt(output_file_path, predictions, fmt='%.4f')
+
+
+# all the predictions are the same
+# rewrite _results_to_binding_predictions
+# bad correlation
+# too good val_accuracy (too low val size?)
+# write the report
 
 
 def _parse_selex_file_paths(file_paths):

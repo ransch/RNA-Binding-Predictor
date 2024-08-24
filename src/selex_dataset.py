@@ -62,7 +62,7 @@ def combined_selex_dataset(file_paths, validation_data_size):
          validation set consists of `validation_data_size` examples.
     """
     # The number of examples of each cycle in the returned validation set.
-    each_cycle_val_count = validation_data_size // len(file_paths)
+    each_cycle_val_count = validation_data_size // (len(file_paths) + 1)
 
     # Create a dataset for each positive cycle.
     datasets = [
