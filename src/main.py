@@ -39,16 +39,15 @@ def _get_model(max_given_cycle):
     """
     model = keras.Sequential()
 
-    model.add(layers.LSTM(1024), return_sequences=True))
-    model.add(layers.LSTM(512))
+    model.add(layers.LSTM(1024))
 
     model.add(layers.Dense(256, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
 
-    # model.add(layers.Dense(128, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
-    # model.add(layers.BatchNormalization())
-    # model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
+    model.add(layers.Dense(128, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
 
     model.add(layers.Dense(64, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
     model.add(layers.BatchNormalization())
@@ -56,7 +55,7 @@ def _get_model(max_given_cycle):
 
     model.add(layers.Dense(5, activation='softmax'))
 
-    # model.add(AverageLast(5 - max_given_cycle))
+    model.add(AverageLast(5 - max_given_cycle))
 
     model.compile(optimizer=optimizers.Adam(learning_rate=0.01, beta_1=0.7, beta_2=0.8),
                   loss='SparseCategoricalCrossentropy',
