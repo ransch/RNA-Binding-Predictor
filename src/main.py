@@ -19,8 +19,8 @@ _STEPS_PER_EPOCH = 1024
 _BATCH_SIZE = 128
 _PREDICTION_BATCH_SIZE = 512
 _VALIDATION_DATA_SIZE = 32768
-_MIN_ACCURACY_IMPROVEMENT_DELTA = .1
-_ACCURACY_IMPROVEMENT_PATIENCE = 3
+_MIN_ACCURACY_IMPROVEMENT_DELTA = .0001
+_ACCURACY_IMPROVEMENT_PATIENCE = 5
 _L2_REGULARIZATION_FACTOR = .01
 _LEAKY_RELU_SLOPE = .1
 _MAX_MINUTES_TIME_LIMIT = 55
@@ -42,8 +42,8 @@ def _get_model(max_given_cycle):
     model.add(layers.LSTM(64))
 
     model.add(layers.Dense(32, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
-    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
     model.add(layers.BatchNormalization())
+    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
 
     model.add(layers.Dense(5, activation='softmax'))
 
@@ -117,6 +117,29 @@ def _get_selex_dataset(selex_file_paths, validation_data_size):
     return train_ds, val_ds
 
 
+def _get_tensors(dataset):
+    """
+    Transform a batched dataset into a pair of tensors - the first is the features and the second
+    is the labels.
+
+    Args:
+        dataset: A Dataset instance.
+
+    Returns:
+        A pair of tensors - the first is the features and the second is the labels.
+    """
+    features, labels = [], []
+
+    for features_batch, labels_batch in dataset:
+        features.append(features_batch.numpy())
+        labels.append(labels_batch.numpy())
+
+    features = np.concatenate(features, axis=0)
+    labels = np.concatenate(labels, axis=0)
+
+    return features, labels
+
+
 def main():
     output_file_path = sys.argv[1]
     rna_compete_file_path = sys.argv[2]
@@ -142,8 +165,8 @@ def main():
               epochs=_MAX_EPOCHS_NUM,
               steps_per_epoch=_STEPS_PER_EPOCH,
               callbacks=[time_limit_callback, early_stopping_callback],
-              validation_data=val_ds,
-              validation_steps=_VALIDATION_DATA_SIZE // _PREDICTION_BATCH_SIZE)
+              validation_data=_get_tensors(val_ds),
+              validation_batch_size=_PREDICTION_BATCH_SIZE)
 
     # Evaluate the model on the RNAcompete dataset, and translate the model's outputs into binding
     # predictions.

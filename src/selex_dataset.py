@@ -38,7 +38,7 @@ def _selex_dataset(file_path, cycle):
     # Parse the lines as tensors.
     ds = ds.map(_parse_selex_line, num_parallel_calls=tf.data.AUTOTUNE, deterministic=False)
     return tf.data.Dataset.zip(
-        (ds, tf.data.Dataset.from_tensor_slices(tf.constant([cycle])))).cache()
+        (ds, tf.data.Dataset.from_tensor_slices(tf.constant([cycle])).repeat()))
 
 
 # An infinite dataset of the zero cycle.
