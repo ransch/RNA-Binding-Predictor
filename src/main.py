@@ -63,6 +63,72 @@ def _get_model(max_given_cycle):
     return model
 
 
+def _get_model2(max_given_cycle, vocab_size, embedding_dim, max_sequence_length):
+    # Not used. Another option for the net structure.
+    model = keras.Sequential()
+
+    model.add(layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=max_sequence_length))
+
+    model.add(layers.Bidirectional(layers.LSTM(512, return_sequences=True, recurrent_dropout=0.3)))
+    model.add(layers.Bidirectional(layers.LSTM(512)))
+
+    model.add(layers.Dense(256, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
+    model.add(layers.Dropout(rate=0.3))
+    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
+
+    model.add(layers.Dense(5, activation='softmax'))
+
+    model.add(AverageLast(5 - max_given_cycle))
+
+    model.compile(optimizer=optimizers.Adam(learning_rate=_ADAM_LEARNING_RATE),
+                  loss='SparseCategoricalCrossentropy',
+                  metrics=['accuracy'])
+
+    return model
+
+
+def _get_model3(vocab_size, max_sequence_length, num_classes, embedding_dim=16):
+    # Not used. Another option for the net structure.
+
+    model = keras.Sequential()
+
+    # Embedding layer for nucleotide sequences
+    model.add(layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=max_sequence_length))
+
+    # Convolutional layers to extract local patterns/motifs
+    model.add(layers.Conv1D(filters=128, kernel_size=5, activation='relu', padding='same'))
+    model.add(layers.MaxPooling1D(pool_size=2))
+
+    model.add(layers.Conv1D(filters=128, kernel_size=3, activation='relu', padding='same'))
+    model.add(layers.MaxPooling1D(pool_size=2))
+
+    # Bi-directional LSTM layer to capture sequence dependencies
+    model.add(layers.Bidirectional(layers.LSTM(256, return_sequences=True, dropout=0.3, recurrent_dropout=0.3)))
+
+    # Attention layer for focusing on important sequence parts
+    model.add(layers.Attention())
+
+    # Global pooling to reduce dimensions
+    model.add(layers.GlobalMaxPooling1D())
+
+    # Dense layers for complex patterns
+    model.add(layers.Dense(128, activation='relu'))
+    model.add(layers.Dropout(rate=0.3))
+
+    model.add(layers.Dense(64, activation='relu'))
+    model.add(layers.Dropout(rate=0.3))
+
+    model.add(layers.Dense(num_classes, activation='softmax'))
+    loss = 'sparse_categorical_crossentropy'
+    metrics = ['accuracy']
+
+    model.compile(optimizer=optimizers.Adam(learning_rate=0.001),
+                  loss=loss,
+                  metrics=metrics)
+
+    return model
+
+
 def _results_to_binding_predictions(model_results):
     # TODO
     return model_results[:, 4] + model_results[:, 3] - model_results[:, 0]
