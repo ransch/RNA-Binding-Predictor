@@ -38,7 +38,7 @@ def _selex_dataset(file_path, cycle):
     # Parse the lines as tensors.
     ds = ds.map(_parse_selex_line, num_parallel_calls=tf.data.AUTOTUNE, deterministic=False)
     return tf.data.Dataset.zip(
-        (ds, tf.data.Dataset.from_tensor_slices(tf.constant([cycle])))).cache()
+        (ds, tf.data.Dataset.from_tensor_slices(tf.constant([cycle])).repeat()))
 
 
 # An infinite dataset of the zero cycle.
@@ -62,7 +62,7 @@ def combined_selex_dataset(file_paths, validation_data_size):
          validation set consists of `validation_data_size` examples.
     """
     # The number of examples of each cycle in the returned validation set.
-    each_cycle_val_count = validation_data_size // len(file_paths)
+    each_cycle_val_count = validation_data_size // (len(file_paths) + 1)
 
     # Create a dataset for each positive cycle.
     datasets = [
