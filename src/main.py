@@ -155,7 +155,6 @@ def _use_saved_model_for_rna_compete_ds(output_file_path, rna_compete_file_path)
         batch_size=_PREDICTION_BATCH_SIZE, padded_shapes=[None, 4], padding_values=0)
     model_results = model.predict(rna_compete_ds)
     predictions = _results_to_binding_predictions(model_results)
-
     # Write the predictions to a file.
     _write_predictions(output_file_path, predictions)
 
