@@ -8,6 +8,7 @@ from keras import layers
 from keras import optimizers
 from keras import regularizers
 
+from average_last_cycles import AverageLast
 from dna_dataset_utils import augment_dataset
 from rna_compete_dataset import rna_compete_dataset
 from selex_dataset import combined_selex_dataset
@@ -25,9 +26,12 @@ _LEAKY_RELU_SLOPE = .1
 _MAX_MINUTES_TIME_LIMIT = 55
 
 
-def _get_model():
+def _get_model(max_given_cycle):
     """
     Get the binding prediction model.
+
+    Args:
+        max_given_cycle: The maximum cycle that we have data for.
 
     Returns:
          The prediction model.
@@ -42,6 +46,8 @@ def _get_model():
     model.add(layers.BatchNormalization())
 
     model.add(layers.Dense(5, activation='softmax'))
+
+    model.add(AverageLast(5 - max_given_cycle))
 
     model.compile(optimizer=optimizers.Adam(learning_rate=0.001),
                   loss='SparseCategoricalCrossentropy',
@@ -82,13 +88,14 @@ def main():
     output_file_path = sys.argv[1]
     rna_compete_file_path = sys.argv[2]
     selex_file_paths = _parse_selex_file_paths(sys.argv[3:])
+    max_given_cycle = max(selex_file_paths.keys())
 
     selex_ds = (augment_dataset(combined_selex_dataset(selex_file_paths))
                 .padded_batch(batch_size=_BATCH_SIZE, padded_shapes=([None, 4], []),
                               padding_values=0))
     rna_compete_ds = rna_compete_dataset(rna_compete_file_path).padded_batch(
         batch_size=_PREDICTION_BATCH_SIZE, padded_shapes=[None, 4], padding_values=0)
-    model = _get_model()
+    model = _get_model(max_given_cycle)
 
     # Split the dataset into training and validation sets.
     val_ds = selex_ds.take(_VALIDATION_DATA_SIZE)
