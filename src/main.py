@@ -14,8 +14,8 @@ from rna_compete_dataset import rna_compete_dataset
 from selex_dataset import combined_selex_dataset
 from time_limit import TimeLimitCallback
 
-_MAX_EPOCHS_NUM = 100
-_STEPS_PER_EPOCH = 1024
+_MAX_EPOCHS_NUM = 1000
+_STEPS_PER_EPOCH = 2048
 _BATCH_SIZE = 128
 _PREDICTION_BATCH_SIZE = 512
 _VALIDATION_DATA_SIZE = 32768
@@ -24,6 +24,7 @@ _ACCURACY_IMPROVEMENT_PATIENCE = 5
 _L2_REGULARIZATION_FACTOR = .01
 _LEAKY_RELU_SLOPE = .1
 _MAX_MINUTES_TIME_LIMIT = 55
+_ADAM_LEARNING_RATE = 0.001
 
 
 def _get_model(max_given_cycle):
@@ -38,18 +39,26 @@ def _get_model(max_given_cycle):
     """
     model = keras.Sequential()
 
-    model.add(layers.LSTM(256, return_sequences=True))
-    model.add(layers.LSTM(64))
+    model.add(layers.LSTM(1024), return_sequences=True))
+    model.add(layers.LSTM(512))
 
-    model.add(layers.Dense(32, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
+    model.add(layers.Dense(256, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
+
+    # model.add(layers.Dense(128, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
+    # model.add(layers.BatchNormalization())
+    # model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
+
+    model.add(layers.Dense(64, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
 
     model.add(layers.Dense(5, activation='softmax'))
 
-    model.add(AverageLast(5 - max_given_cycle))
+    # model.add(AverageLast(5 - max_given_cycle))
 
-    model.compile(optimizer=optimizers.Adam(learning_rate=0.001),
+    model.compile(optimizer=optimizers.Adam(learning_rate=0.01, beta_1=0.7, beta_2=0.8),
                   loss='SparseCategoricalCrossentropy',
                   metrics=['accuracy'])
 
