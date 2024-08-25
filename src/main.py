@@ -19,7 +19,7 @@ SAVED_MODEL_PATH = './RNA-Binding-Predictor/saved_model.keras'
 
 _MAX_EPOCHS_NUM = 1000
 _STEPS_PER_EPOCH = 2048
-_BATCH_SIZE = 128
+_BATCH_SIZE = 64
 _PREDICTION_BATCH_SIZE = 512
 _VALIDATION_DATA_SIZE = 32768
 _MIN_ACCURACY_IMPROVEMENT_DELTA = .0001
@@ -27,7 +27,7 @@ _ACCURACY_IMPROVEMENT_PATIENCE = 5
 _L2_REGULARIZATION_FACTOR = .01
 _LEAKY_RELU_SLOPE = .1
 _MAX_MINUTES_TIME_LIMIT = 55
-_ADAM_LEARNING_RATE = 0.001
+_ADAM_LEARNING_RATE = 0.002
 
 MAX_SEQUENCE_LENGTH = 40
 NUM_CLASSES = 4
@@ -40,7 +40,7 @@ NUM_HEADS = 4
 KEY_DIM = 64
 
 
-def _get_model(max_given_cycle):
+def _get_model():
     """
     Get the binding prediction model.
 
@@ -52,20 +52,25 @@ def _get_model(max_given_cycle):
     """
     model = keras.Sequential()
 
-    model.add(layers.LSTM(1024))
+    # LSTM layers with dropout and regularization
+    model.add(layers.LSTM(256, return_sequences=True, input_shape=(40, 4),
+                          kernel_regularizer=regularizers.l2(0.01)))
+    model.add(layers.LSTM(128, kernel_regularizer=regularizers.l2(0.01)))
+    model.add(layers.Dropout(0.5))
 
-    model.add(layers.Dense(256, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
+    # Dense layers with Batch Normalization and LeakyReLU activation
+    model.add(layers.Dense(128, kernel_regularizer=regularizers.l2(0.01)))
     model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
+    model.add(layers.LeakyReLU(negative_slope=0.01))
 
-    model.add(layers.Dense(64, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
+    model.add(layers.Dense(64, kernel_regularizer=regularizers.l2(0.01)))
     model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
+    model.add(layers.LeakyReLU(negative_slope=0.01))
 
+    # Output layer for classification
     model.add(layers.Dense(5, activation='softmax'))
 
-    #model.add(AverageLast(5 - max_given_cycle))
-
+    # Compile the model
     model.compile(optimizer=optimizers.Adam(learning_rate=_ADAM_LEARNING_RATE),
                   loss='sparse_categorical_crossentropy',
                   metrics=['accuracy'])
@@ -73,43 +78,11 @@ def _get_model(max_given_cycle):
     return model
 
 
-def _get_model2():
-    # Input layer
-    inputs = keras.layers.Input(shape=(MAX_SEQUENCE_LENGTH, NUM_CLASSES))
-
-    # Convolutional layer
-    x = keras.layers.Conv1D(filters=FILTERS, kernel_size=KERNEL_SIZE, activation='relu')(inputs)
-    x = keras.layers.MaxPooling1D(pool_size=POOL_SIZE)(x)
-
-    # Bidirectional LSTM layer
-    x = keras.layers.Bidirectional(keras.layers.LSTM(64, return_sequences=True))(x)
-
-    # MultiHeadAttention layer
-    # For MultiHeadAttention, we need to use the same tensor for query, key, and value
-    query = x
-    value = x
-    key = x
-    attention_output = keras.layers.MultiHeadAttention(num_heads=NUM_HEADS, key_dim=KEY_DIM)(query, value, key)
-    attention_output = keras.layers.LayerNormalization()(attention_output)
-    x = keras.layers.Add()([x, attention_output])  # Residual connection
-
-    # Flatten the output
-    x = keras.layers.GlobalMaxPooling1D()(x)
-
-    # Fully connected layers with dropout
-    x = keras.layers.Dense(DENSE_UNITS_1, activation='relu')(x)
-    x = keras.layers.Dropout(0.5)(x)
-    x = keras.layers.Dense(DENSE_UNITS_2, activation='relu')(x)
-    x = keras.layers.Dropout(0.5)(x)
-
-    # Output layer for regression (predicting binding intensity)
-    outputs = keras.layers.Dense(1, activation='linear')(x)
-
-    # Define and compile the model
-    model = keras.Model(inputs=inputs, outputs=outputs)
-    model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
-
-    return model
+callbacks_list = [
+    keras.callbacks.EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True),
+    keras.callbacks.ModelCheckpoint(filepath=SAVED_MODEL_PATH, monitor='val_loss', save_best_only=True),
+    keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=10, min_lr=1e-6)
+]
 
 
 def _results_to_binding_predictions(model_results):
@@ -226,7 +199,7 @@ def main():
     train_ds, val_ds = _get_selex_dataset(selex_file_paths, _VALIDATION_DATA_SIZE)
     rna_compete_ds = rna_compete_dataset(rna_compete_file_path).padded_batch(
         batch_size=_PREDICTION_BATCH_SIZE, padded_shapes=[None, 4], padding_values=0)
-    model = _get_model(max_given_cycle)
+    model = _get_model()
 
     time_limit_callback = TimeLimitCallback(max_minutes=_MAX_MINUTES_TIME_LIMIT)
     early_stopping_callback = keras.callbacks.EarlyStopping(
@@ -241,7 +214,7 @@ def main():
     model.fit(train_ds,
               epochs=_MAX_EPOCHS_NUM,
               steps_per_epoch=_STEPS_PER_EPOCH,
-              callbacks=[time_limit_callback, early_stopping_callback],
+              callbacks=[callbacks_list],
               validation_data=_get_tensors(val_ds),
               validation_batch_size=_PREDICTION_BATCH_SIZE)
 
