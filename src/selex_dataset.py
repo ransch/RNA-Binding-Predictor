@@ -2,7 +2,7 @@ import tensorflow as tf
 
 from dna_dataset_utils import random_sequence_dataset, dna_line_filter, sequence_to_tensor
 
-_SHUFFLE_BUFFER_SIZE = 20000
+_SHUFFLE_BUFFER_SIZE = 100000
 _SELEX_SEQ_LEN = 40
 
 

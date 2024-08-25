@@ -27,7 +27,7 @@ _MIN_ACCURACY_IMPROVEMENT_DELTA = .0001
 _L2_REGULARIZATION_FACTOR = .01
 _LEAKY_RELU_SLOPE = .01
 _MAX_MINUTES_TIME_LIMIT = 55
-_ADAM_LEARNING_RATE = 0.002
+_ADAM_LEARNING_RATE = 0.004
 
 
 def _get_model(max_given_cycle):
@@ -44,17 +44,17 @@ def _get_model(max_given_cycle):
     model.add(layers.Input(shape=(None, 4)))
 
     # LSTM layers with dropout and regularization
-    model.add(layers.LSTM(256, return_sequences=True,
+    model.add(layers.LSTM(126, return_sequences=True,
                           kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
-    model.add(layers.LSTM(128, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
+    model.add(layers.LSTM(64, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
     model.add(layers.Dropout(0.5))
 
     # Dense layers with Batch Normalization and LeakyReLU activation
-    model.add(layers.Dense(128, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
+    model.add(layers.Dense(64, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
 
-    model.add(layers.Dense(64, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
+    model.add(layers.Dense(32, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
 
