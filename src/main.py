@@ -15,7 +15,7 @@ from rna_compete_dataset import rna_compete_dataset
 from selex_dataset import combined_selex_dataset
 from time_limit import TimeLimitCallback
 
-SAVED_MODEL_PATH = 'saved_model'
+SAVED_MODEL_PATH = './RNA-Binding-Predictor/saved_model.keras'
 
 _MAX_EPOCHS_NUM = 1000
 _STEPS_PER_EPOCH = 2048
@@ -28,6 +28,16 @@ _L2_REGULARIZATION_FACTOR = .01
 _LEAKY_RELU_SLOPE = .1
 _MAX_MINUTES_TIME_LIMIT = 55
 _ADAM_LEARNING_RATE = 0.001
+
+MAX_SEQUENCE_LENGTH = 40
+NUM_CLASSES = 4
+FILTERS = 64
+KERNEL_SIZE = 5
+POOL_SIZE = 2
+DENSE_UNITS_1 = 128
+DENSE_UNITS_2 = 64
+NUM_HEADS = 4
+KEY_DIM = 64
 
 
 def _get_model(max_given_cycle):
@@ -54,77 +64,50 @@ def _get_model(max_given_cycle):
 
     model.add(layers.Dense(5, activation='softmax'))
 
-    model.add(AverageLast(5 - max_given_cycle))
+    #model.add(AverageLast(5 - max_given_cycle))
 
     model.compile(optimizer=optimizers.Adam(learning_rate=_ADAM_LEARNING_RATE),
-                  loss='SparseCategoricalCrossentropy',
+                  loss='sparse_categorical_crossentropy',
                   metrics=['accuracy'])
 
     return model
 
 
-def _get_model2(max_given_cycle, vocab_size, embedding_dim, max_sequence_length):
-    # Not used. Another option for the net structure.
-    model = keras.Sequential()
+def _get_model2():
+    # Input layer
+    inputs = keras.layers.Input(shape=(MAX_SEQUENCE_LENGTH, NUM_CLASSES))
 
-    model.add(layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=max_sequence_length))
+    # Convolutional layer
+    x = keras.layers.Conv1D(filters=FILTERS, kernel_size=KERNEL_SIZE, activation='relu')(inputs)
+    x = keras.layers.MaxPooling1D(pool_size=POOL_SIZE)(x)
 
-    model.add(layers.Bidirectional(layers.LSTM(512, return_sequences=True, recurrent_dropout=0.3)))
-    model.add(layers.Bidirectional(layers.LSTM(512)))
+    # Bidirectional LSTM layer
+    x = keras.layers.Bidirectional(keras.layers.LSTM(64, return_sequences=True))(x)
 
-    model.add(layers.Dense(256, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
-    model.add(layers.Dropout(rate=0.3))
-    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
+    # MultiHeadAttention layer
+    # For MultiHeadAttention, we need to use the same tensor for query, key, and value
+    query = x
+    value = x
+    key = x
+    attention_output = keras.layers.MultiHeadAttention(num_heads=NUM_HEADS, key_dim=KEY_DIM)(query, value, key)
+    attention_output = keras.layers.LayerNormalization()(attention_output)
+    x = keras.layers.Add()([x, attention_output])  # Residual connection
 
-    model.add(layers.Dense(5, activation='softmax'))
+    # Flatten the output
+    x = keras.layers.GlobalMaxPooling1D()(x)
 
-    model.add(AverageLast(5 - max_given_cycle))
+    # Fully connected layers with dropout
+    x = keras.layers.Dense(DENSE_UNITS_1, activation='relu')(x)
+    x = keras.layers.Dropout(0.5)(x)
+    x = keras.layers.Dense(DENSE_UNITS_2, activation='relu')(x)
+    x = keras.layers.Dropout(0.5)(x)
 
-    model.compile(optimizer=optimizers.Adam(learning_rate=_ADAM_LEARNING_RATE),
-                  loss='SparseCategoricalCrossentropy',
-                  metrics=['accuracy'])
+    # Output layer for regression (predicting binding intensity)
+    outputs = keras.layers.Dense(1, activation='linear')(x)
 
-    return model
-
-
-def _get_model3(vocab_size, max_sequence_length, num_classes, embedding_dim=16):
-    # Not used. Another option for the net structure.
-
-    model = keras.Sequential()
-
-    # Embedding layer for nucleotide sequences
-    model.add(layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=max_sequence_length))
-
-    # Convolutional layers to extract local patterns/motifs
-    model.add(layers.Conv1D(filters=128, kernel_size=5, activation='relu', padding='same'))
-    model.add(layers.MaxPooling1D(pool_size=2))
-
-    model.add(layers.Conv1D(filters=128, kernel_size=3, activation='relu', padding='same'))
-    model.add(layers.MaxPooling1D(pool_size=2))
-
-    # Bi-directional LSTM layer to capture sequence dependencies
-    model.add(layers.Bidirectional(layers.LSTM(256, return_sequences=True, dropout=0.3, recurrent_dropout=0.3)))
-
-    # Attention layer for focusing on important sequence parts
-    model.add(layers.Attention())
-
-    # Global pooling to reduce dimensions
-    model.add(layers.GlobalMaxPooling1D())
-
-    # Dense layers for complex patterns
-    model.add(layers.Dense(128, activation='relu'))
-    model.add(layers.Dropout(rate=0.3))
-
-    model.add(layers.Dense(64, activation='relu'))
-    model.add(layers.Dropout(rate=0.3))
-
-    model.add(layers.Dense(num_classes, activation='softmax'))
-    loss = 'sparse_categorical_crossentropy'
-    metrics = ['accuracy']
-
-    model.compile(optimizer=optimizers.Adam(learning_rate=0.001),
-                  loss=loss,
-                  metrics=metrics)
+    # Define and compile the model
+    model = keras.Model(inputs=inputs, outputs=outputs)
+    model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
 
     return model
 
@@ -176,7 +159,7 @@ def _get_selex_dataset(selex_file_paths, validation_data_size):
          A pair of the training and validation sets.
     """
     train_ds, val_ds = combined_selex_dataset(selex_file_paths, validation_data_size)
-    train_ds = augment_dataset(train_ds).padded_batch(
+    train_ds = train_ds.padded_batch(  # augment_dataset(train_ds).padded_batch(
         batch_size=_BATCH_SIZE,
         padded_shapes=([None, 4], []),
         padding_values=0)
