@@ -100,6 +100,10 @@ def _results_to_binding_predictions(model_results):
 
 
 def _write_predictions(output_file_path, predictions):
+    # Truncate the output file.
+    with open(output_file_path, 'w') as _:
+        pass
+    # Write the predictions vector.
     np.savetxt(output_file_path, predictions, fmt='%.4f')
 
 
