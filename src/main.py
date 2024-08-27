@@ -5,12 +5,10 @@ import sys
 import keras
 import numpy as np
 import tensorflow as tf
-from keras import regularizers
-from keras.src.layers import Input, GRU, Dropout, Bidirectional, BatchNormalization, LeakyReLU, \
-    Dense
+from keras.src.layers import Input, GRU, BatchNormalization, LeakyReLU, \
+    Dense, Reshape, TimeDistributed, Flatten
 from keras.src.optimizers import Adam
 
-# from dna_dataset_utils import augment_dataset
 from rna_compete_dataset import rna_compete_dataset
 from selex_dataset import combined_selex_dataset
 from time_limit import TimeLimitCallback
@@ -39,12 +37,19 @@ def _get_model():
     model = keras.Sequential()
     model.add(Input(shape=(None, 4)))
 
-    model.add(Bidirectional(GRU(32, return_sequences=True,
-                                kernel_regularizer=regularizers.l2(_L2_FACTOR))))
-    model.add(GRU(16, kernel_regularizer=regularizers.l2(_L2_FACTOR)))
-    model.add(Dropout(0.3))
+    model.add(Reshape((-1, 5, 4)))
 
-    model.add(Dense(16, kernel_regularizer=regularizers.l2(_L2_FACTOR)))
+    model.add(TimeDistributed(Flatten()))
+    model.add(TimeDistributed(Dense(64)))
+
+    model.add(GRU(16, return_sequences=True))
+    model.add(GRU(16))
+
+    model.add(Dense(16))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
+
+    model.add(Dense(16))
     model.add(BatchNormalization())
     model.add(LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
 
