@@ -14,6 +14,7 @@ from rna_compete_dataset import rna_compete_dataset
 from selex_dataset import combined_selex_dataset
 from time_limit import TimeLimitCallback
 
+_USE_EXPECTED_VALUE_FOR_PREDICTIONS = True
 _SHOULD_SAVE_MODEL = False
 _SAVED_MODEL_PATH = './saved_model.weights.h5'
 
@@ -172,9 +173,12 @@ _TRAINING_CALLBACKS_LIST = [
 ]
 
 
-def _results_to_binding_predictions(model_results):
-    # TODO
-    return model_results[:, 4] + model_results[:, 3] - model_results[:, 0]
+def _results_to_binding_predictions(model_results, labels):
+    if _USE_EXPECTED_VALUE_FOR_PREDICTIONS:
+        return np.dot(model_results, labels)
+    else:  # use argmax
+        indices_of_max_prob = np.argmax(model_results, axis=1)
+        return labels[indices_of_max_prob]
 
 
 def _write_predictions(output_file_path, predictions):
@@ -184,7 +188,7 @@ def _write_predictions(output_file_path, predictions):
     # Write the predictions vector.
     np.savetxt(output_file_path, predictions, fmt='%.4f')
 
-
+# TODO - remove when done:
 # all the predictions are the same
 # rewrite _results_to_binding_predictions
 # bad correlation
@@ -286,13 +290,15 @@ def main():
 
     if _SHOULD_SAVE_MODEL:
         model.save_weights(_SAVED_MODEL_PATH, overwrite=True)
-        with open('./training_history', 'wb') as f:
+        with open('./training_history1_39', 'wb') as f:
             pickle.dump(history.history, f)
 
     # Evaluate the model on the RNAcompete dataset, and translate the model's outputs into binding
     # predictions.
     model_results = model.predict(rna_compete_ds)
-    predictions = _results_to_binding_predictions(model_results)
+    # Translate model results to binding intensity predictions:
+    labels = sorted(selex_file_paths.keys() | {0})
+    predictions = _results_to_binding_predictions(model_results, labels)
 
     # Write the predictions to a file.
     _write_predictions(output_file_path, predictions)
