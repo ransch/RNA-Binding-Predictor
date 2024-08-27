@@ -47,7 +47,7 @@ _ZeroCycleDataset = tf.data.Dataset.zip((random_sequence_dataset(_SELEX_SEQ_LEN)
                                              tf.constant([0])).repeat()))
 
 
-def combined_selex_dataset(file_paths, validation_data_size, zero_cycle=False):
+def combined_selex_dataset(file_paths, validation_data_size):
     """
     Create a SELEX dataset of all the experiment cycles of a single protein.
     The batches of the returned dataset are balanced.
@@ -56,21 +56,20 @@ def combined_selex_dataset(file_paths, validation_data_size, zero_cycle=False):
         file_paths: The paths of all the cycles of a single protein. It's a dictionary that maps
                     the cycle index to its path.
         validation_data_size: The size of the validation set.
-        zero_cycle: Should the dataset contain random sequences representing the zero cycle.
 
     Returns:
          A pair of the training and validation sets. The training set is infinite, and the
          validation set consists of `validation_data_size` examples.
     """
     # The number of examples of each cycle in the returned validation set.
-    if zero_cycle:
-        each_cycle_val_count = validation_data_size // (len(file_paths) + 1)
-    else:
-        each_cycle_val_count = validation_data_size // len(file_paths)
+    each_cycle_val_count = validation_data_size // (len(file_paths) + 1)
 
-    # Create a dataset for each positive cycle.
+    # Create a dataset for each positive cycle. The labels range from 1 to the number of given
+    # cycles. 0 is the label of the zero cycle.
+    file_paths_l = list(file_paths.items())
+    file_paths_l.sort(key=lambda p: p[0])
     datasets = [
-        _selex_dataset(file_path, cycle) for cycle, file_path in file_paths.items()
+        _selex_dataset(file_path[1], cycle + 1) for cycle, file_path in enumerate(file_paths_l)
     ]
 
     # Split the datasets into training and validation sets.
@@ -87,14 +86,18 @@ def combined_selex_dataset(file_paths, validation_data_size, zero_cycle=False):
     train_ds = [ds.repeat().shuffle(_SHUFFLE_BUFFER_SIZE, reshuffle_each_iteration=True)
                 for ds in train_ds]
 
-    if zero_cycle:
-        # Split the zero cycle dataset into training and validation sets.
-        zero_cycle_val_ds = _ZeroCycleDataset.take(each_cycle_val_count)
-        zero_cycle_train_ds = _ZeroCycleDataset.skip(each_cycle_val_count)
+    # Split the zero cycle dataset into training and validation sets.
+    zero_cycle_val_ds = _ZeroCycleDataset.take(each_cycle_val_count)
+    zero_cycle_train_ds = _ZeroCycleDataset.skip(each_cycle_val_count)
 
-        val_ds.append(zero_cycle_val_ds)
-        train_ds.append(zero_cycle_train_ds)
+    val_ds.append(zero_cycle_val_ds)
+    train_ds.append(zero_cycle_train_ds)
+
+    # Give each positive cycle a higher probability to be picked.
+    p = 1 / (1 + 2 * len(file_paths))
+    weights = [p] + [2 * p] * len(file_paths)
 
     # Create the combined train and validation sets. Each cycle dataset is picked uniformly.
-    return (tf.data.Dataset.sample_from_datasets(train_ds, rerandomize_each_iteration=True),
+    return (tf.data.Dataset.sample_from_datasets(train_ds, rerandomize_each_iteration=True,
+                                                 weights=weights),
             tf.data.Dataset.sample_from_datasets(val_ds, rerandomize_each_iteration=True))

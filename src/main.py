@@ -1,7 +1,7 @@
-import os
 import pathlib
-import sys
+import pathlib
 import pickle
+import sys
 
 import keras
 import numpy as np
@@ -28,7 +28,7 @@ _MAX_MINUTES_TIME_LIMIT = 55
 _ADAM_LEARNING_RATE = 0.002
 
 
-def _get_model1():
+def _get_model1(last_dense_size):
     model = keras.Sequential()
     model.add(Input(shape=(None, 4)))
 
@@ -40,7 +40,7 @@ def _get_model1():
     model.add(BatchNormalization())
     model.add(LeakyReLU(0.3))
 
-    model.add(Dense(5, activation='softmax'))
+    model.add(Dense(last_dense_size, activation='softmax'))
 
     model.compile(optimizer=Adam(learning_rate=_ADAM_LEARNING_RATE),
                   loss='sparse_categorical_crossentropy',
@@ -48,7 +48,7 @@ def _get_model1():
     return model
 
 
-def _get_model2():
+def _get_model2(last_dense_size):
     model = keras.Sequential()
     model.add(Input(shape=(None, 4)))
 
@@ -60,7 +60,7 @@ def _get_model2():
     model.add(BatchNormalization())
     model.add(LeakyReLU(negative_slope=0.3))
 
-    model.add(Dense(5, activation='softmax'))
+    model.add(Dense(last_dense_size, activation='softmax'))
 
     model.compile(optimizer=Adam(learning_rate=_ADAM_LEARNING_RATE),
                   loss='sparse_categorical_crossentropy',
@@ -68,7 +68,7 @@ def _get_model2():
     return model
 
 
-def _get_model3():
+def _get_model3(last_dense_size):
     model = keras.Sequential()
     model.add(Input(shape=(None, 4)))
 
@@ -84,7 +84,7 @@ def _get_model3():
     model.add(BatchNormalization())
     model.add(LeakyReLU(_LEAKY_RELU_SLOPE))
 
-    model.add(Dense(5, activation='softmax'))
+    model.add(Dense(last_dense_size, activation='softmax'))
 
     model.compile(optimizer=Adam(learning_rate=_ADAM_LEARNING_RATE),
                   loss='sparse_categorical_crossentropy',
@@ -93,7 +93,7 @@ def _get_model3():
     return model
 
 
-def _get_model4():
+def _get_model4(last_dense_size):
     model = keras.Sequential()
     model.add(Input(shape=(None, 4)))
 
@@ -108,7 +108,7 @@ def _get_model4():
     model.add(BatchNormalization())
     model.add(LeakyReLU(_LEAKY_RELU_SLOPE))
 
-    model.add(Dense(5, activation='softmax'))
+    model.add(Dense(last_dense_size, activation='softmax'))
 
     model.compile(optimizer=Adam(learning_rate=_ADAM_LEARNING_RATE),
                   loss='sparse_categorical_crossentropy',
@@ -117,7 +117,7 @@ def _get_model4():
     return model
 
 
-def _get_model5():
+def _get_model5(last_dense_size):
     model = keras.Sequential()
     model.add(Input(shape=(None, 4)))
 
@@ -137,7 +137,7 @@ def _get_model5():
     model.add(BatchNormalization())
     model.add(LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
 
-    model.add(Dense(5, activation='softmax'))
+    model.add(Dense(last_dense_size, activation='softmax'))
 
     model.compile(optimizer=Adam(learning_rate=_ADAM_LEARNING_RATE),
                   loss='sparse_categorical_crossentropy',
@@ -146,14 +146,14 @@ def _get_model5():
     return model
 
 
-def _get_model():
+def _get_model(last_dense_size):
     """
     Get the binding prediction model.
 
     Returns:
          The prediction model.
     """
-    return _get_model1()
+    return _get_model1(last_dense_size)
 
 
 _TRAINING_CALLBACKS_LIST = [
@@ -268,31 +268,26 @@ def main():
     rna_compete_ds = rna_compete_dataset(rna_compete_file_path).padded_batch(
         batch_size=_PREDICTION_BATCH_SIZE, padded_shapes=[45, 4], padding_values=0)
 
-    if _SHOULD_SAVE_MODEL and os.path.exists(_SAVED_MODEL_PATH):
-        print("Loading saved model...")
-        model = _get_model()
-        model.summary()
-        model.load_weights(_SAVED_MODEL_PATH)
-    else:
-        selex_file_paths = _parse_selex_file_paths(sys.argv[3:])
+    selex_file_paths = _parse_selex_file_paths(sys.argv[3:])
 
-        train_ds, val_ds = _get_selex_dataset(selex_file_paths, _VALIDATION_DATA_SIZE)
-        model = _get_model()
-        model.summary()
+    train_ds, val_ds = _get_selex_dataset(selex_file_paths, _VALIDATION_DATA_SIZE)
+    print(f'Creating a model with {len(selex_file_paths) + 1} classes')
+    model = _get_model(len(selex_file_paths) + 1)
+    model.summary()
 
-        # Fit the model using the SELEX dataset, limiting the training time and stopping if the
-        # validation accuracy stops improving.
-        history = model.fit(train_ds,
-                            epochs=_MAX_EPOCHS_NUM,
-                            steps_per_epoch=_STEPS_PER_EPOCH,
-                            callbacks=[_TRAINING_CALLBACKS_LIST],
-                            validation_data=_get_tensors(val_ds),
-                            validation_batch_size=_PREDICTION_BATCH_SIZE)
+    # Fit the model using the SELEX dataset, limiting the training time and stopping if the
+    # validation accuracy stops improving.
+    history = model.fit(train_ds,
+                        epochs=_MAX_EPOCHS_NUM,
+                        steps_per_epoch=_STEPS_PER_EPOCH,
+                        callbacks=[_TRAINING_CALLBACKS_LIST],
+                        validation_data=_get_tensors(val_ds),
+                        validation_batch_size=_PREDICTION_BATCH_SIZE)
 
-        if _SHOULD_SAVE_MODEL:
-            model.save_weights(_SAVED_MODEL_PATH, overwrite=True)
-            with open('./training_history', 'wb') as f:
-                pickle.dump(history.history, f)
+    if _SHOULD_SAVE_MODEL:
+        model.save_weights(_SAVED_MODEL_PATH, overwrite=True)
+        with open('./training_history', 'wb') as f:
+            pickle.dump(history.history, f)
 
     # Evaluate the model on the RNAcompete dataset, and translate the model's outputs into binding
     # predictions.
