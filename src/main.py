@@ -73,14 +73,14 @@ def _get_model(max_given_cycle):
 
 _TRAINING_CALLBACKS_LIST = [
     keras.callbacks.ReduceLROnPlateau(
-        monitor='val_accuracy',
-        mode='max', factor=0.5,
+        monitor='val_loss',
+        mode='min', factor=0.5,
         patience=5,
         min_lr=1e-6),
     TimeLimitCallback(max_minutes=_MAX_MINUTES_TIME_LIMIT),
     keras.callbacks.EarlyStopping(
-        monitor='val_accuracy',
-        mode='max',
+        monitor='val_loss',
+        mode='min',
         min_delta=_MIN_ACCURACY_IMPROVEMENT_DELTA,
         patience=10,
         restore_best_weights=True)
