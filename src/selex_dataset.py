@@ -47,7 +47,7 @@ _ZeroCycleDataset = tf.data.Dataset.zip((random_sequence_dataset(_SELEX_SEQ_LEN)
                                              tf.constant([0])).repeat()))
 
 
-def combined_selex_dataset(file_paths, validation_data_size):
+def combined_selex_dataset(file_paths, validation_data_size, zero_cycle=False):
     """
     Create a SELEX dataset of all the experiment cycles of a single protein.
     The batches of the returned dataset are balanced.
@@ -56,13 +56,17 @@ def combined_selex_dataset(file_paths, validation_data_size):
         file_paths: The paths of all the cycles of a single protein. It's a dictionary that maps
                     the cycle index to its path.
         validation_data_size: The size of the validation set.
+        zero_cycle: Should the dataset contain random sequences representing the zero cycle.
 
     Returns:
          A pair of the training and validation sets. The training set is infinite, and the
          validation set consists of `validation_data_size` examples.
     """
     # The number of examples of each cycle in the returned validation set.
-    each_cycle_val_count = validation_data_size // (len(file_paths) + 1)
+    if zero_cycle:
+        each_cycle_val_count = validation_data_size // (len(file_paths) + 1)
+    else:
+        each_cycle_val_count = validation_data_size // len(file_paths)
 
     # Create a dataset for each positive cycle.
     datasets = [
@@ -83,12 +87,13 @@ def combined_selex_dataset(file_paths, validation_data_size):
     train_ds = [ds.repeat().shuffle(_SHUFFLE_BUFFER_SIZE, reshuffle_each_iteration=True)
                 for ds in train_ds]
 
-    # Split the zero cycle dataset into training and validation sets.
-    zero_cycle_val_ds = _ZeroCycleDataset.take(each_cycle_val_count)
-    zero_cycle_train_ds = _ZeroCycleDataset.skip(each_cycle_val_count)
+    if zero_cycle:
+        # Split the zero cycle dataset into training and validation sets.
+        zero_cycle_val_ds = _ZeroCycleDataset.take(each_cycle_val_count)
+        zero_cycle_train_ds = _ZeroCycleDataset.skip(each_cycle_val_count)
 
-    val_ds.append(zero_cycle_val_ds)
-    train_ds.append(zero_cycle_train_ds)
+        val_ds.append(zero_cycle_val_ds)
+        train_ds.append(zero_cycle_train_ds)
 
     # Create the combined train and validation sets. Each cycle dataset is picked uniformly.
     return (tf.data.Dataset.sample_from_datasets(train_ds, rerandomize_each_iteration=True),
