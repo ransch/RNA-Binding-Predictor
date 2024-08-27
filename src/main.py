@@ -6,7 +6,7 @@ import keras
 import numpy as np
 import tensorflow as tf
 from keras.src.layers import Input, GRU, BatchNormalization, LeakyReLU, \
-    Dense, Reshape, TimeDistributed, Flatten
+    Dense, Reshape, TimeDistributed, Flatten, Bidirectional, LSTM, Dropout, ConvLSTM1D
 from keras.src.optimizers import Adam
 
 from rna_compete_dataset import rna_compete_dataset
@@ -27,13 +27,96 @@ _MAX_MINUTES_TIME_LIMIT = 55
 _ADAM_LEARNING_RATE = 0.002
 
 
-def _get_model():
-    """
-    Get the binding prediction model.
+def _get_model1():
+    model = keras.Sequential()
+    model.add(Input(shape=(None, 4)))
 
-    Returns:
-         The prediction model.
-    """
+    model.add(Bidirectional(LSTM(16, return_sequences=True)))
+    model.add(LSTM(16))
+    model.add(Dropout(0.5))
+
+    model.add(Dense(16))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(0.3))
+
+    model.add(Dense(5, activation='softmax'))
+
+    model.compile(optimizer=Adam(learning_rate=_ADAM_LEARNING_RATE),
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    return model
+
+
+def _get_model2():
+    model = keras.Sequential()
+    model.add(Input(shape=(None, 4)))
+
+    model.add(Bidirectional(GRU(16, return_sequences=True)))
+    model.add(GRU(16))
+    model.add(Dropout(0.3))
+
+    model.add(Dense(16))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(negative_slope=0.3))
+
+    model.add(Dense(5, activation='softmax'))
+
+    model.compile(optimizer=Adam(learning_rate=_ADAM_LEARNING_RATE),
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    return model
+
+
+def _get_model3():
+    model = keras.Sequential()
+    model.add(Input(shape=(None, 4)))
+
+    model.add(Reshape((-1, 5, 4)))
+
+    model.add(TimeDistributed(Flatten()))
+    model.add(TimeDistributed(Dense(128)))
+
+    model.add(GRU(64))
+    model.add(Dropout(0.3))
+
+    model.add(Dense(16))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(_LEAKY_RELU_SLOPE))
+
+    model.add(Dense(5, activation='softmax'))
+
+    model.compile(optimizer=Adam(learning_rate=_ADAM_LEARNING_RATE),
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+
+    return model
+
+
+def _get_model4():
+    model = keras.Sequential()
+    model.add(Input(shape=(None, 4)))
+
+    model.add(Reshape((-1, 5, 4)))
+
+    model.add(ConvLSTM1D(filters=64, kernel_size=3, activation='relu'))
+    model.add(Dropout(0.3))
+
+    model.add(Flatten())
+
+    model.add(Dense(16))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(_LEAKY_RELU_SLOPE))
+
+    model.add(Dense(5, activation='softmax'))
+
+    model.compile(optimizer=Adam(learning_rate=_ADAM_LEARNING_RATE),
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+
+    return model
+
+
+def _get_model5():
     model = keras.Sequential()
     model.add(Input(shape=(None, 4)))
 
@@ -42,7 +125,7 @@ def _get_model():
     model.add(TimeDistributed(Flatten()))
     model.add(TimeDistributed(Dense(64)))
 
-    model.add(GRU(16, return_sequences=True))
+    model.add(GRU(32, return_sequences=True))
     model.add(GRU(16))
 
     model.add(Dense(16))
@@ -60,6 +143,16 @@ def _get_model():
                   metrics=['accuracy'])
 
     return model
+
+
+def _get_model():
+    """
+    Get the binding prediction model.
+
+    Returns:
+         The prediction model.
+    """
+    return _get_model1()
 
 
 _TRAINING_CALLBACKS_LIST = [
