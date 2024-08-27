@@ -172,7 +172,7 @@ def main():
     rna_compete_file_path = sys.argv[2]
 
     rna_compete_ds = rna_compete_dataset(rna_compete_file_path).padded_batch(
-        batch_size=_PREDICTION_BATCH_SIZE, padded_shapes=[None, 4], padding_values=0)
+        batch_size=_PREDICTION_BATCH_SIZE, padded_shapes=[45, 4], padding_values=0)
 
     if _SHOULD_SAVE_MODEL and os.path.exists(_SAVED_MODEL_PATH):
         print("Loading saved model...")
