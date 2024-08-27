@@ -5,9 +5,10 @@ import sys
 import keras
 import numpy as np
 import tensorflow as tf
-from keras import layers
-from keras import optimizers
 from keras import regularizers
+from keras.src.layers import Input, GRU, Dropout, Bidirectional, BatchNormalization, LeakyReLU, \
+    Dense
+from keras.src.optimizers import Adam
 
 # from dna_dataset_utils import augment_dataset
 from rna_compete_dataset import rna_compete_dataset
@@ -22,11 +23,10 @@ _STEPS_PER_EPOCH = 2048
 _BATCH_SIZE = 64
 _PREDICTION_BATCH_SIZE = 512
 _VALIDATION_DATA_SIZE = 32768
-_MIN_ACCURACY_IMPROVEMENT_DELTA = .0001
-_L2_REGULARIZATION_FACTOR = .01
-_LEAKY_RELU_SLOPE = .01
+_L2_FACTOR = .01
+_LEAKY_RELU_SLOPE = .1
 _MAX_MINUTES_TIME_LIMIT = 55
-_ADAM_LEARNING_RATE = 0.004
+_ADAM_LEARNING_RATE = 0.002
 
 
 def _get_model():
@@ -37,28 +37,20 @@ def _get_model():
          The prediction model.
     """
     model = keras.Sequential()
-    model.add(layers.Input(shape=(None, 4)))
+    model.add(Input(shape=(None, 4)))
 
-    # LSTM layers with dropout and regularization
-    model.add(layers.LSTM(126, return_sequences=True,
-                          kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
-    model.add(layers.LSTM(64, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
-    model.add(layers.Dropout(0.5))
+    model.add(Bidirectional(GRU(32, return_sequences=True,
+                                kernel_regularizer=regularizers.l2(_L2_FACTOR))))
+    model.add(GRU(16, kernel_regularizer=regularizers.l2(_L2_FACTOR)))
+    model.add(Dropout(0.3))
 
-    # Dense layers with Batch Normalization and LeakyReLU activation
-    model.add(layers.Dense(64, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
+    model.add(Dense(16, kernel_regularizer=regularizers.l2(_L2_FACTOR)))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
 
-    model.add(layers.Dense(32, kernel_regularizer=regularizers.l2(_L2_REGULARIZATION_FACTOR)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU(negative_slope=_LEAKY_RELU_SLOPE))
+    model.add(Dense(5, activation='softmax'))
 
-    # Output layer for classification
-    model.add(layers.Dense(5, activation='softmax'))
-
-    # Compile the model
-    model.compile(optimizer=optimizers.Adam(learning_rate=_ADAM_LEARNING_RATE),
+    model.compile(optimizer=Adam(learning_rate=_ADAM_LEARNING_RATE),
                   loss='sparse_categorical_crossentropy',
                   metrics=['accuracy'])
 
@@ -69,14 +61,14 @@ _TRAINING_CALLBACKS_LIST = [
     keras.callbacks.ReduceLROnPlateau(
         monitor='val_loss',
         mode='min', factor=0.5,
-        patience=5,
+        patience=3,
         min_lr=1e-6),
     TimeLimitCallback(max_minutes=_MAX_MINUTES_TIME_LIMIT),
     keras.callbacks.EarlyStopping(
         monitor='val_loss',
         mode='min',
-        min_delta=_MIN_ACCURACY_IMPROVEMENT_DELTA,
-        patience=10,
+        min_delta=.0001,
+        patience=9,
         restore_best_weights=True)
 ]
 
@@ -180,12 +172,14 @@ def main():
     if _SHOULD_SAVE_MODEL and os.path.exists(_SAVED_MODEL_PATH):
         print("Loading saved model...")
         model = _get_model()
+        model.summary()
         model.load_weights(_SAVED_MODEL_PATH)
     else:
         selex_file_paths = _parse_selex_file_paths(sys.argv[3:])
 
         train_ds, val_ds = _get_selex_dataset(selex_file_paths, _VALIDATION_DATA_SIZE)
         model = _get_model()
+        model.summary()
 
         # Fit the model using the SELEX dataset, limiting the training time and stopping if the
         # validation accuracy stops improving.
