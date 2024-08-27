@@ -9,14 +9,13 @@ from keras import layers
 from keras import optimizers
 from keras import regularizers
 
-# from average_last_cycles import AverageLast
 # from dna_dataset_utils import augment_dataset
 from rna_compete_dataset import rna_compete_dataset
 from selex_dataset import combined_selex_dataset
 from time_limit import TimeLimitCallback
 
 _SHOULD_SAVE_MODEL = False
-_SAVED_MODEL_PATH = './saved_model.keras'
+_SAVED_MODEL_PATH = './saved_model.weights.h5'
 
 _MAX_EPOCHS_NUM = 1000
 _STEPS_PER_EPOCH = 2048
@@ -30,12 +29,9 @@ _MAX_MINUTES_TIME_LIMIT = 55
 _ADAM_LEARNING_RATE = 0.004
 
 
-def _get_model(max_given_cycle):
+def _get_model():
     """
     Get the binding prediction model.
-
-    Args:
-        max_given_cycle: The maximum cycle that we have data for.
 
     Returns:
          The prediction model.
@@ -61,8 +57,6 @@ def _get_model(max_given_cycle):
     # Output layer for classification
     model.add(layers.Dense(5, activation='softmax'))
 
-    # model.add(AverageLast(5 - max_given_cycle))
-
     # Compile the model
     model.compile(optimizer=optimizers.Adam(learning_rate=_ADAM_LEARNING_RATE),
                   loss='sparse_categorical_crossentropy',
@@ -85,13 +79,6 @@ _TRAINING_CALLBACKS_LIST = [
         patience=10,
         restore_best_weights=True)
 ]
-
-if _SHOULD_SAVE_MODEL:
-    _TRAINING_CALLBACKS_LIST.append(
-        keras.callbacks.ModelCheckpoint(
-            filepath=_SAVED_MODEL_PATH,
-            monitor='val_loss',
-            save_best_only=True))
 
 
 def _results_to_binding_predictions(model_results):
@@ -192,13 +179,13 @@ def main():
 
     if _SHOULD_SAVE_MODEL and os.path.exists(_SAVED_MODEL_PATH):
         print("Loading saved model...")
-        model = keras.models.load_model(_SAVED_MODEL_PATH)
+        model = _get_model()
+        model.load_weights(_SAVED_MODEL_PATH)
     else:
         selex_file_paths = _parse_selex_file_paths(sys.argv[3:])
-        max_given_cycle = max(selex_file_paths.keys())
 
         train_ds, val_ds = _get_selex_dataset(selex_file_paths, _VALIDATION_DATA_SIZE)
-        model = _get_model(max_given_cycle)
+        model = _get_model()
 
         # Fit the model using the SELEX dataset, limiting the training time and stopping if the
         # validation accuracy stops improving.
@@ -208,6 +195,9 @@ def main():
                   callbacks=[_TRAINING_CALLBACKS_LIST],
                   validation_data=_get_tensors(val_ds),
                   validation_batch_size=_PREDICTION_BATCH_SIZE)
+
+        if _SHOULD_SAVE_MODEL:
+            model.save_weights(_SAVED_MODEL_PATH, overwrite=True)
 
     # Evaluate the model on the RNAcompete dataset, and translate the model's outputs into binding
     # predictions.
