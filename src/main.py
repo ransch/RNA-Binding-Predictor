@@ -1,6 +1,7 @@
 import os
 import pathlib
 import sys
+import pickle
 
 import keras
 import numpy as np
@@ -281,15 +282,17 @@ def main():
 
         # Fit the model using the SELEX dataset, limiting the training time and stopping if the
         # validation accuracy stops improving.
-        model.fit(train_ds,
-                  epochs=_MAX_EPOCHS_NUM,
-                  steps_per_epoch=_STEPS_PER_EPOCH,
-                  callbacks=[_TRAINING_CALLBACKS_LIST],
-                  validation_data=_get_tensors(val_ds),
-                  validation_batch_size=_PREDICTION_BATCH_SIZE)
+        history = model.fit(train_ds,
+                            epochs=_MAX_EPOCHS_NUM,
+                            steps_per_epoch=_STEPS_PER_EPOCH,
+                            callbacks=[_TRAINING_CALLBACKS_LIST],
+                            validation_data=_get_tensors(val_ds),
+                            validation_batch_size=_PREDICTION_BATCH_SIZE)
 
         if _SHOULD_SAVE_MODEL:
             model.save_weights(_SAVED_MODEL_PATH, overwrite=True)
+            with open('./training_history', 'wb') as f:
+                pickle.dump(history.history, f)
 
     # Evaluate the model on the RNAcompete dataset, and translate the model's outputs into binding
     # predictions.
