@@ -12,9 +12,10 @@ from keras.src.optimizers import Adam
 
 from rna_compete_dataset import rna_compete_dataset
 from selex_dataset import combined_selex_dataset
+from dna_dataset_utils import augment_dataset
 from time_limit import TimeLimitCallback
 
-_USE_EXPECTED_VALUE_FOR_PREDICTIONS = True
+_USE_EXPECTED_VALUE_FOR_PREDICTIONS = False  # use argmax
 _SHOULD_SAVE_MODEL = False
 _SAVED_MODEL_PATH = './saved_model.weights.h5'
 
@@ -154,13 +155,13 @@ def _get_model(last_dense_size):
     Returns:
          The prediction model.
     """
-    return _get_model1(last_dense_size)
+    return _get_model2(last_dense_size)
 
 
 _TRAINING_CALLBACKS_LIST = [
     keras.callbacks.ReduceLROnPlateau(
         monitor='val_loss',
-        mode='min', factor=0.5,
+        mode='min', factor=0.7,
         patience=3,
         min_lr=1e-6),
     TimeLimitCallback(max_minutes=_MAX_MINUTES_TIME_LIMIT),
@@ -168,7 +169,7 @@ _TRAINING_CALLBACKS_LIST = [
         monitor='val_loss',
         mode='min',
         min_delta=.0001,
-        patience=9,
+        patience=16,
         restore_best_weights=True)
 ]
 
@@ -177,6 +178,7 @@ def _results_to_binding_predictions(model_results, labels):
     if _USE_EXPECTED_VALUE_FOR_PREDICTIONS:
         return np.dot(model_results, labels)
     else:  # use argmax
+        labels = np.array(labels)
         indices_of_max_prob = np.argmax(model_results, axis=1)
         return labels[indices_of_max_prob]
 
@@ -187,13 +189,6 @@ def _write_predictions(output_file_path, predictions):
         pass
     # Write the predictions vector.
     np.savetxt(output_file_path, predictions, fmt='%.4f')
-
-# TODO - remove when done:
-# all the predictions are the same
-# rewrite _results_to_binding_predictions
-# bad correlation
-# too good val_accuracy (too low val size?)
-# write the report
 
 
 def _parse_selex_file_paths(file_paths):
@@ -227,7 +222,7 @@ def _get_selex_dataset(selex_file_paths, validation_data_size):
          A pair of the training and validation sets.
     """
     train_ds, val_ds = combined_selex_dataset(selex_file_paths, validation_data_size)
-    # train_ds = augment_dataset(train_ds)
+    #train_ds = augment_dataset(train_ds)
     train_ds = train_ds.padded_batch(
         batch_size=_BATCH_SIZE,
         padded_shapes=([None, 4], []),
@@ -290,7 +285,7 @@ def main():
 
     if _SHOULD_SAVE_MODEL:
         model.save_weights(_SAVED_MODEL_PATH, overwrite=True)
-        with open('./training_history1_39', 'wb') as f:
+        with open('./training_history', 'wb') as f:
             pickle.dump(history.history, f)
 
     # Evaluate the model on the RNAcompete dataset, and translate the model's outputs into binding
